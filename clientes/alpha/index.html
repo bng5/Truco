@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8" />
+  <title>Truco - Alpha</title>
+  <link href="truco.css" rel="stylesheet" type="text/css" />
+  <script type="text/javascript" src="cliente.js"></script>
+</head>
+<body>
+
+<div id="error" style="display: none;">
+    <h3>Error</h3>
+    <p id="errorMensaje"></p>
+</div>
+<div id="login">
+    <h2>Login</h2>
+    <form onsubmit="return login(this)">
+        <label>Nick</label> <input type="text" name="nick" /> <input type="submit" value="Entrar" />
+    </form>
+</div>
+
+<div id="lobby" style="display:none;">
+    <h2>Lobby</h2>
+    <p>Usuarios: <span id="total_usuarios"> </span></p>
+    <div id="chat">
+        <div id="mensajes"></div>
+        <textarea name="mensaje" cols="15" rows="2"></textarea><input type="button" value="Enviar" onclick="enviarMensaje(this.previousSibling)" />
+    </div>
+    <div id="mesas">
+        <p>Mesas: <span id="total_mesas"> </span></p>
+        <ul></ul>
+        <input type="button" value="Crear mesa" onclick="crearMesa(2)" />
+    </div>
+</div>
+
+<div id="mesa" style="display:none;">
+    <h2>Mesa</h2>
+    <div id="chat_mesa">
+        <div id="mensajes_mesa"></div>
+        <textarea name="mensaje" cols="15" rows="2"></textarea><input type="button" value="Enviar" onclick="enviarMensaje(this.previousSibling)" />
+    </div>
+</div>
+
+
+    <!-- pre id="output"></pre>
+    <div id="comandos">
+        <button onclick="conectar()">Conectar</button>
+        <button onclick="websocket.close()">Desconectar</button>
+        <button onclick="crearMesa()"><img alt="gtk-add" src="moz-icon://stock/gtk-add?size=menu"> Crear mesa</button>
+    </div>
+    <select name="mesas" id="mesas" size="5"><optgroup label="Mesas"></optgroup></select -->
+</body>
+</html>

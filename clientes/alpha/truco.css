@@ -1,0 +1,17 @@
+
+
+#error {
+    background-color: antiquewhite;
+    border: 1px solid #800000;
+    color: #800000;
+    padding: 10px;
+}
+
+#mensajes {
+    height: 300px;
+    overflow: auto;
+}
+
+.nickname {
+    font-weight: bold;
+}
