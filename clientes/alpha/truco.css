@@ -20,7 +20,7 @@ body {
     width: 100%;
 }
 
-#mensajes {
+.mensajes {
     height: 300px;
     overflow: auto;
 }

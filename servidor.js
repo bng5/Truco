@@ -172,12 +172,10 @@ var mediador = {
 //            var nickname = formulario.elements.namedItem('nick').value.replace(/^\s+|\s+$/g, '');
 //console.log(nickname, nickname.length);
 //        if(nickname == '') {}
-
-
         conexion.nickname = nickname;
         conexion.ubicacion = Lobby;
         usuarios.push(conexion);
-        Lobby.agregarUsuario(conexion)
+        Lobby.agregarUsuario(conexion);
         return {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes};
     },
     mensaje: function(data, conexion) {
@@ -213,6 +211,15 @@ var mediador = {
         return {type: 'entrada_mesa', historial: mesa.mensajes};
     },
     mesa_abandonar: function(data, conexion) {
+    },
+    obtener_mesas: function(data, conexion) {
+
+        var listado = [];
+        for(var i = 0; i < mesas.length; i++) {
+            listado.push({id: i, cantidadJugadores: mesas[i].cantidadJugadores, usuarios: mesas[i].usuarios.length, jugadores: mesas[i].jugadores.length});
+        }
+
+        return {type: 'listado_mesa', "mesas": listado};
     }
 };
 
@@ -248,7 +255,10 @@ Mesa.prototype = {
         broadcast(data, this.usuarios, conexion);
 
         if(this.usuarios.length == 0) {
-            mesas.splice(mesas.indexOf(this), 1);
+            var index = mesas.indexOf(this);
+            if(index > -1) {
+                mesas.splice(mesas.indexOf(this), 1);
+            }
         }
 
     },
@@ -314,6 +324,7 @@ var Lobby = new Mesa();
 //    }
 //};
 
+var mesas_total = 0;
 var mesas = [];
 
 var usuarios = [];

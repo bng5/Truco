@@ -65,6 +65,10 @@ function crearMesa(cantidadJugadores) {
     websocket.send(JSON.stringify({type: 'mesa_crear', cantidad: cantidadJugadores}));
 }
 
+function obtenerMesas() {
+    websocket.send(JSON.stringify({type: 'obtener_mesas'}));
+}
+
 var Chat = {
     mensajes: null,
     textarea: null,
@@ -101,6 +105,10 @@ var listeners = {
         document.getElementById('lobby').hidden = false;
         document.getElementById('total_usuarios').firstChild.textContent = data.total_usuarios;
         document.getElementById('total_mesas').firstChild.textContent = data.total_mesas;
+console.log(data.total_mesas);
+        if(data.total_mesas) {
+            obtenerMesas();
+        }
         Chat.mensajes = document.getElementById('mensajes');
         for(var i = 0; i < data.historial.length; i++) {
             this[data.historial[i].type](data.historial[i]);
@@ -130,6 +138,9 @@ var listeners = {
     },
     user_del: function(data) {
         Chat.agregarMensaje(data.tiempo, data.nick+' se fue.');
+    },
+    listado_mesa: function(data) {
+console.log(data);
     }
 };
 window.addEventListener("load", init, false);
