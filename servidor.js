@@ -226,18 +226,18 @@ function broadcast(data, usuarios, conexion_origen) {
 }
 
 function Jugador() {
-	this.nick = null;
+    this.nick = null;
 }
 
 function Mesa(cantidadJugadores) {
     this.cantidadJugadores = cantidadJugadores;
     this.usuarios = [];
     this.mensajes = [];
-	this.jugadores = [];
-	this.muestra;
-	this.enJuego = new Array();
-	
+    this.jugadores = [];
+    this.muestra;
+    this.enJuego = new Array();
 }
+
 Mesa.prototype = {
     eliminarUsuario: function(conexion) {
         this.usuarios.splice(this.usuarios.indexOf(conexion), 1);
@@ -258,24 +258,24 @@ Mesa.prototype = {
             this.mensajes.splice(0, 1)
         }
     },
-	repartir: function() {
+    repartir: function() {
 
-	},
-	obtenerCarta: function() {
-		var k;
-		do {
-			valida = true;
-			k = Math.floor(Math.random() * cartas.length);
-			for(var j = 0; j < this.enJuego.length; j++) {
-				if(this.enJuego[j] == k) {
-					valida = false;
-					continue;
-				}
-			}
-		}while(valida == false);
-		this.enJuego.push(k);
-		return k;
-	},
+    },
+    obtenerCarta: function() {
+        var k;
+        do {
+            valida = true;
+            k = Math.floor(Math.random() * cartas.length);
+            for(var j = 0; j < this.enJuego.length; j++) {
+                if(this.enJuego[j] == k) {
+                    valida = false;
+                    continue;
+                }
+            }
+        }while(valida == false);
+        this.enJuego.push(k);
+        return k;
+    },
     agregarUsuario: function(conexion) {
         this.usuarios.push(conexion);
         var date = new Date();
