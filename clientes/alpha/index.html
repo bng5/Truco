@@ -7,23 +7,29 @@
 </head>
 <body>
 
-<div id="error" style="display: none;">
+<div id="error" hidden="hidden">
     <h3>Error</h3>
     <p id="errorMensaje"></p>
 </div>
-<div id="login">
-    <h2>Login</h2>
-    <form onsubmit="return login(this)">
-        <label>Nick</label> <input type="text" name="nick" /> <input type="submit" value="Entrar" />
-    </form>
+
+<div id="login" class="pantalla">
+    <div id="distance"></div>
+    <div id="login_form">
+        <form action="" method="post" onsubmit="return login(this)">
+            <label for="nick" title="Nick (4 a 16 caracteres)">Nick</label>
+            <input type="text" name="nick" id="nick" maxlength="16" />
+            <input type="submit" value="Entrar" />
+        </form>
+    </div>
+    <p id="version"> </p>
 </div>
 
-<div id="lobby" style="display:none;">
+<div id="lobby" class="pantalla" hidden="hidden">
     <h2>Lobby</h2>
     <p>Usuarios: <span id="total_usuarios"> </span></p>
-    <div id="chat">
-        <div id="mensajes"></div>
-        <textarea name="mensaje" cols="15" rows="2"></textarea><input type="button" value="Enviar" onclick="enviarMensaje(this.previousSibling)" />
+    <div id="chat" class="chat">
+        <div id="mensajes" class="mensajes"></div>
+        <textarea cols="15" rows="2" onkeypress="return capturaEnter(event, this)"></textarea><input type="button" value="Enviar" onclick="enviarMensaje(this.previousSibling)" />
     </div>
     <div id="mesas">
         <p>Mesas: <span id="total_mesas"> </span></p>
@@ -32,11 +38,11 @@
     </div>
 </div>
 
-<div id="mesa" style="display:none;">
+<div id="mesa" class="pantalla" hidden="hidden">
     <h2>Mesa</h2>
     <div id="chat_mesa">
-        <div id="mensajes_mesa"></div>
-        <textarea name="mensaje" cols="15" rows="2"></textarea><input type="button" value="Enviar" onclick="enviarMensaje(this.previousSibling)" />
+        <div id="mensajes_mesa" class="mensajes"></div>
+        <textarea cols="15" rows="2" onkeypress="return capturaEnter(event, this)"></textarea><input type="button" value="Enviar" onclick="enviarMensaje(this.previousSibling)" />
     </div>
 </div>
 

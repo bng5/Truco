@@ -1,12 +1,12 @@
 //var wsUri = "ws://echo.websocket.org/";
 
 var websocket;
-var wsUri = 'ws://'+document.location.hostname+':8080';
-//var wsUri = "ws://localhost:8080";
+var wsUri = 'ws://'+document.location.host;
 var output;
 function init() {
     //output = document.getElementById("output");
     openWebSocket();
+    document.getElementById('nick').focus();
 }
 
 function openWebSocket() {
@@ -17,7 +17,7 @@ function openWebSocket() {
 //        console.log(evt);
     };
     websocket.onclose = function(evt) {
-//        console.log(evt);
+        listeners.error({desc: 'Se ha perdido la conexi\u00F3n con el servidor.'});
     };
     websocket.onmessage = function(evt) {
         //console.log(evt);
@@ -36,24 +36,23 @@ function openWebSocket() {
     };
 }
 
-function writeToScreen(message) {
-    return;
-    //var pre = document.createElement("p");
-    //pre.style.wordWrap = "break-word";
-    //pre.innerHTML = message;
-    //output.appendChild(pre);
-//        output.appendChild(document.createTextNode(message+'\n'));
-    output.innerHTML += message+'\n';
-}
-
 function login(formulario) {
-    var nickname = formulario.elements.namedItem('nick').value;
+    var nickname = formulario.elements.namedItem('nick').value.replace(/^\s+|\s+$/g, '');
+    //var nickname = formulario.elements.namedItem('nick').value;
     if(nickname == '') {
         alert("No, m'hijo.\nMeté un nombre.");
         return false;
     }
     websocket.send(JSON.stringify({type: 'nick', nick: nickname}));
     return false;
+}
+
+function capturaEnter(evento, el) {
+    if(evento['which'] == 13 && !evento.shiftKey) {
+        enviarMensaje(el);
+        return false;
+    }
+    return true;
 }
 
 function enviarMensaje(textarea) {
@@ -63,64 +62,74 @@ function enviarMensaje(textarea) {
 }
 
 function crearMesa(cantidadJugadores) {
-    websocket.send(JSON.stringify({type: 'crear_mesa', cantidad: cantidadJugadores}));
+    websocket.send(JSON.stringify({type: 'mesa_crear', cantidad: cantidadJugadores}));
 }
 
+var Chat = {
+    mensajes: null,
+    textarea: null,
+    agregarMensaje: function(tiempo, mensaje, nickname) {
+        //newExcitingAlerts(data.nick+': '+data.mensaje);
+        if(!this.mensajes) {
+            return;
+        }
+        var p = this.mensajes.appendChild(document.createElement('p'));
+        var date = new Date();
+        date.setTime(tiempo);
+        var hora = p.appendChild(document.createElement('span'));
+        hora.className = 'hora';
+        hora.appendChild(document.createTextNode('['+date.toLocaleTimeString()+']'));
+        p.appendChild(document.createTextNode(' '));
+        if(nickname) {
+            var nick = document.createElement('span');
+            nick.className = 'nickname';
+            nick.appendChild(document.createTextNode(nickname+':'));
+            p.appendChild(nick);
+        }
+        p.appendChild(document.createTextNode(' '+mensaje));
+        this.mensajes.scrollTop = (this.mensajes.scrollHeight - this.mensajes.clientHeight);
+    }
+};
+
 var listeners = {
+    conectado: function(data) {
+        //docdata.espera
+        document.getElementById('version').firstChild.textContent = 'Versión: '+data.version;
+    },
     entrada_lobby: function(data) {
-        document.getElementById('login').style.display = 'none';
-        document.getElementById('lobby').style.display = 'block';
+        document.getElementById('login').hidden = true;
+        document.getElementById('lobby').hidden = false;
         document.getElementById('total_usuarios').firstChild.textContent = data.total_usuarios;
         document.getElementById('total_mesas').firstChild.textContent = data.total_mesas;
+        Chat.mensajes = document.getElementById('mensajes');
         for(var i = 0; i < data.historial.length; i++) {
-console.log(data.historial[i].type);
             this[data.historial[i].type](data.historial[i]);
 //            this.mensaje(data.historial[i]);
         }
         //console.log('Mesas: %s. Usuarios: %s', data.total_mesas, data.total_usuarios)
     },
     entrada_mesa: function(data) {
-        document.getElementById('lobby').style.display = 'none';
-        document.getElementById('mesa').style.display = 'block';
+        document.getElementById('lobby').hidden = true;
+        document.getElementById('mesa').hidden = false;
         //document.getElementById('total_usuarios').firstChild.textContent = data.total_usuarios;
 
+        Chat.mensajes = document.getElementById('mensajes_mesa');
         for(var i = 0; i < data.historial.length; i++) {
-            this.mensaje(data.historial[i]);
+            this[data.historial[i].type](data.historial[i]);
         }
     },
     error: function(data) {
         document.getElementById('errorMensaje').innerHTML = data.desc;
-        document.getElementById('error').style.display = 'block';
+        document.getElementById('error').hidden = false;
     },
     mensaje: function(data) {
-
-        newExcitingAlerts(data.nick+': '+data.mensaje);
-        var mensajes = document.getElementById('mensajes');
-        var p = mensajes.appendChild(document.createElement('p'));
-        var date = new Date();
-        date.setTime(data.tiempo);
-        p.appendChild(document.createTextNode('['+date.toLocaleTimeString()+'] '));
-        var nick = document.createElement('span');
-        nick.className = 'nickname';
-        nick.appendChild(document.createTextNode(data.nick+':'));
-        p.appendChild(nick);
-        p.appendChild(document.createTextNode(' '+data.mensaje));
+        Chat.agregarMensaje(data.tiempo, data.mensaje, data.nick);
     },
     user_add: function(data) {
-        var mensajes = document.getElementById('mensajes');
-        var p = mensajes.appendChild(document.createElement('p'));
-        var date = new Date();
-        date.setTime(data.tiempo);
-        p.appendChild(document.createTextNode('['+date.toLocaleTimeString()+'] '));
-        p.appendChild(document.createTextNode(' '+data.nick+' ha entrado.'));
+        Chat.agregarMensaje(data.tiempo, data.nick+' ha entrado.');
     },
     user_del: function(data) {
-        var mensajes = document.getElementById('mensajes');
-        var p = mensajes.appendChild(document.createElement('p'));
-        var date = new Date();
-        date.setTime(data.tiempo);
-        p.appendChild(document.createTextNode('['+date.toLocaleTimeString()+'] '));
-        p.appendChild(document.createTextNode(' '+data.nick+' se fue.'));
+        Chat.agregarMensaje(data.tiempo, data.nick+' se fue.');
     }
 };
 window.addEventListener("load", init, false);

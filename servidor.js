@@ -28,6 +28,10 @@ var url = require("url"),
     //port = process.argv[2] || 8888;
 /* **** */
 
+if(!fs.exists) {
+    fs.exists = path.exists;
+}
+
 var server = http.createServer(function(request, response) {
 
     var uri = url.parse(request.url).pathname;
@@ -103,8 +107,9 @@ wsServer.on('request', function(request) {
 
     var connection = request.accept('chat', request.origin);//echo-protocol', request.origin);
 
-    
+    // TODO Enviar cantidad de usuarios y métodos de acceso (ej. nick)
     console.log((new Date()) + ' Connection accepted.');
+    connection.sendUTF(JSON.stringify({type: 'conectado', version: '0.0.1', espera: 'nick'}));
 
     connection.on('message', function(message) {
 //type: 'utf8', utf8Data
@@ -112,10 +117,15 @@ wsServer.on('request', function(request) {
             console.log('Received Message: ' + message.utf8Data);
             var data = JSON.parse(message.utf8Data);
             var respuesta;
-            try {
-                respuesta = mediador[data.type](data, this);
-            } catch (exception) {
-                respuesta = {type: 'error', cod: 1, desc: 'No se pudo interpretar la orden.'};
+            if(typeof mediador[data.type] == 'function') {
+                try {
+                    respuesta = mediador[data.type](data, this);
+                } catch (exception) {
+                    respuesta = {type: 'error', cod: 1, desc: 'No se pudo interpretar la orden.'};
+                }
+            }
+            else {
+                respuesta = {type: 'error', cod: 2, desc: 'Tipo de mensaje ('+data.type+') erroneo.'};
             }
 
             if(typeof respuesta == 'object') {
@@ -149,6 +159,7 @@ wsServer.on('request', function(request) {
         if(this.ubicacion) {
             this.ubicacion.eliminarUsuario(this);
         }
+        usuarios.splice(usuarios.indexOf(this), 1);
     });
 //    connection.on('end', function(a,b,c) {
 //        console.log('end', a,b,c);
@@ -157,7 +168,13 @@ wsServer.on('request', function(request) {
 
 var mediador = {
     nick: function(data, conexion) {
-        conexion.nickname = data.nick;
+        var nickname = data.nick.trim();
+//            var nickname = formulario.elements.namedItem('nick').value.replace(/^\s+|\s+$/g, '');
+//console.log(nickname, nickname.length);
+//        if(nickname == '') {}
+
+
+        conexion.nickname = nickname;
         conexion.ubicacion = Lobby;
         usuarios.push(conexion);
         Lobby.agregarUsuario(conexion)
@@ -170,14 +187,32 @@ var mediador = {
         conexion.ubicacion.agregarMensaje(data);
         broadcast(data, conexion.ubicacion.usuarios, null);//conexion)
     },
-    crear_mesa: function(data, conexion) {
+    mesa_crear: function(data, conexion) {
         // TODO: Notifcar Lobby
         var mesa = new Mesa(data.cantidad);
+        mesas.push(mesa);
+        data.mesa = mesas.indexOf(mesa);
+        return this.mesa_entrar(data, conexion);
+
+    },
+    mesa_entrar: function(data, conexion) {
+        var mesa = mesas[data.mesa];
         conexion.ubicacion.eliminarUsuario(conexion);
         conexion.ubicacion = mesa;
-
-        mesas.push(mesa);
-        return {type: 'entrada_mesa', jugadores: [], historial: mesa.mensajes};
+        conexion.ubicacion.agregarUsuario(conexion);
+        // FIXME mesa.jugadores circular data.
+        var usuarios = [];
+        for(var i = 0; i < mesa.usuarios.length; i++) {
+            usuarios.push({nick: mesa.usuarios[i].nickname});
+        }
+        var jugadores = [];
+        for(var i = 0; i < mesa.jugadores.length; i++) {
+            jugadores.push({nick: mesa.usuarios[i].nickname});
+        }
+        //jugadores: mesa.jugadores, usuarios: mesa.usuarios,
+        return {type: 'entrada_mesa', historial: mesa.mensajes};
+    },
+    mesa_abandonar: function(data, conexion) {
     }
 };
 
@@ -189,33 +224,6 @@ function broadcast(data, usuarios, conexion_origen) {
         }
     }
 }
-
-var Lobby = {
-    usuarios: [],
-    mensajes: [],
-    eliminarUsuario: function(conexion) {
-        this.usuarios.splice(this.usuarios.indexOf(conexion), 1);
-        var date = new Date();
-        var time = date.getTime();
-        var data = {type: 'user_del', nick: conexion.nickname, tiempo: time};
-        this.agregarMensaje(data);
-        broadcast(data, this.usuarios, conexion);
-    },
-    agregarMensaje: function(data) {
-        this.mensajes.push(data);
-        if(this.mensajes.length > 10) {
-            this.mensajes.splice(0, 1)
-        }
-    },
-    agregarUsuario: function(conexion) {
-        this.usuarios.push(conexion);
-        var date = new Date();
-        var time = date.getTime();
-        var data = {type: 'user_add', nick: conexion.nickname, tiempo: time};
-        this.agregarMensaje(data);
-        broadcast(data, this.usuarios, conexion);
-    }
-};
 
 function Jugador() {
 	this.nick = null;
@@ -233,9 +241,16 @@ function Mesa(cantidadJugadores) {
 Mesa.prototype = {
     eliminarUsuario: function(conexion) {
         this.usuarios.splice(this.usuarios.indexOf(conexion), 1);
+        var date = new Date();
+        var time = date.getTime();
+        var data = {type: 'user_del', nick: conexion.nickname, tiempo: time};
+        this.agregarMensaje(data);
+        broadcast(data, this.usuarios, conexion);
+
         if(this.usuarios.length == 0) {
             mesas.splice(mesas.indexOf(this), 1);
         }
+
     },
     agregarMensaje: function(data) {
         this.mensajes.push(data);
@@ -260,8 +275,44 @@ Mesa.prototype = {
 		}while(valida == false);
 		this.enJuego.push(k);
 		return k;
-	}
+	},
+    agregarUsuario: function(conexion) {
+        this.usuarios.push(conexion);
+        var date = new Date();
+        var time = date.getTime();
+        var data = {type: 'user_add', nick: conexion.nickname, tiempo: time};
+        this.agregarMensaje(data);
+        broadcast(data, this.usuarios, null);//conexion);
+    }
 };
+
+var Lobby = new Mesa();
+//var Lobby = {
+//    usuarios: [],
+//    mensajes: [],
+//    eliminarUsuario: function(conexion) {
+//        this.usuarios.splice(this.usuarios.indexOf(conexion), 1);
+//        var date = new Date();
+//        var time = date.getTime();
+//        var data = {type: 'user_del', nick: conexion.nickname, tiempo: time};
+//        this.agregarMensaje(data);
+//        broadcast(data, this.usuarios, conexion);
+//    },
+//    agregarMensaje: function(data) {
+//        this.mensajes.push(data);
+//        if(this.mensajes.length > 10) {
+//            this.mensajes.splice(0, 1)
+//        }
+//    },
+//    agregarUsuario: function(conexion) {
+//        this.usuarios.push(conexion);
+//        var date = new Date();
+//        var time = date.getTime();
+//        var data = {type: 'user_add', nick: conexion.nickname, tiempo: time};
+//        this.agregarMensaje(data);
+//        broadcast(data, this.usuarios, conexion);
+//    }
+//};
 
 var mesas = [];
 

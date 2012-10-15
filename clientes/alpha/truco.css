@@ -1,10 +1,23 @@
+* {
+    padding: 0;
+    margin: 0;
+}
 
+html, body, .pantalla  {
+    height: 100%;
+}
+
+body {
+    font-family: sans-serif;
+}
 
 #error {
     background-color: antiquewhite;
     border: 1px solid #800000;
     color: #800000;
     padding: 10px;
+    position: absolute;
+    width: 100%;
 }
 
 #mensajes {
@@ -12,6 +25,51 @@
     overflow: auto;
 }
 
-.nickname {
-    font-weight: bold;
+.pantalla {
+
+}
+
+#login {
+    background-color: #019AD2;
+}
+
+    #distance {
+        float: left;
+        height: 50%;
+        margin-bottom: -0.5em;
+        width: 1px;
+    }
+    #login_form {
+        clear: left;
+        display: block;
+        float: left;
+        min-height: 1em;
+        position: relative;
+        width: 100%;
+    }
+    #login_form label,
+    #login_form input,
+    #login_form button {
+        font-size: 2em;
+    }
+    #login_form input[type="text"] {
+        width: 10em;
+    }
+    #login_form form {
+        display: table;
+        margin: 0 auto;
+        width: auto;
+    }
+    .nickname {
+        font-weight: bold;
+    }
+    #version {
+        bottom: 4px;
+        font-size: 11px;
+        position: absolute;
+        right: 10px;
+    }
+
+.chat p {
+    white-space: pre;
 }
