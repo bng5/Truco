@@ -3,21 +3,51 @@
 var websocket;
 var wsUri = 'ws://'+document.location.host;
 var output;
+
+//function Jugador() {
+//    this.nick = null;
+//    this.reconexion_intentos = 0;
+//}
+
+var jugador = {
+    nick: null,
+    reconexion_intentos: 0
+};
+
 function init() {
     //output = document.getElementById("output");
     openWebSocket();
     document.getElementById('nick').focus();
 }
 
-function openWebSocket() {
+function openWebSocket(callback, reconexion) {
 
+    if(reconexion) {
+        jugador.reconexion_intentos++
+    }
+    
     websocket = new WebSocket(wsUri, 'chat');//, 'echo-protocol');
 
     websocket.onopen = function(evt) {
-//        console.log(evt);
-    };
+        if(callback) {
+            callback();//function(evt) {
+    //        console.log(evt);
+        }
+    }
+    
     websocket.onclose = function(evt) {
-        listeners.error({desc: 'Se ha perdido la conexi\u00F3n con el servidor.'});
+        console.log(evt);
+        //alert(' code: '+evt.code+'  \n reason: '+evt.reason+' \n wasClean: '+(evt.wasClean ? 'si' : 'no'));
+        if(!evt.wasClean && jugador.reconexion_intentos == 0) {
+            //reconectar();
+            openWebSocket(function() {
+                if(jugador.nick) {
+                    websocket.send(JSON.stringify({type: 'reconectar', nick: jugador.nick}));
+                }
+                jugador.reconexion_intentos = 0;
+            }, true);
+            listeners.error({desc: 'Se ha perdido la conexi\u00F3n con el servidor.'});
+        }
     };
     websocket.onmessage = function(evt) {
         //console.log(evt);
@@ -27,11 +57,13 @@ function openWebSocket() {
         } catch (exception) {
             listeners.error({desc: exception.message});
         }
-
-        //websocket.close();
     };
     
     websocket.onerror = function(evt) {
+        console.log(evt);
+        evt.stopPropagation();
+        evt.preventDefault();
+        jugador.reconexion_intentos = 0;
         listeners.error({desc: 'No fue posible conectar al servidor.'});
     };
 }
@@ -41,10 +73,21 @@ function login(formulario) {
     //var nickname = formulario.elements.namedItem('nick').value;
     if(nickname == '') {
         alert("No, m'hijo.\nMeté un nombre.");
+        document.getElementById('nick').focus();
         return false;
     }
     websocket.send(JSON.stringify({type: 'nick', nick: nickname}));
+    jugador.nick = nickname;
     return false;
+}
+
+function reconectar() {
+    console.log(websocket);
+}
+
+function desconectar() {
+    websocket.send(JSON.stringify({type: 'desconectar'}));
+    //websocket.close();
 }
 
 function capturaEnter(evento, el) {
@@ -127,6 +170,7 @@ console.log(data.total_mesas);
         }
     },
     error: function(data) {
+        console.error(data.desc);
         document.getElementById('errorMensaje').innerHTML = data.desc;
         document.getElementById('error').hidden = false;
     },

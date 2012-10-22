@@ -25,7 +25,7 @@ var http = require('http');
 var url = require("url"),
     path = require("path"),
     fs = require("fs");
-    //port = process.argv[2] || 8888;
+    //port = process.argv[2] || 8080;
 /* **** */
 
 if(!fs.exists) {
@@ -173,10 +173,15 @@ var mediador = {
 //console.log(nickname, nickname.length);
 //        if(nickname == '') {}
         conexion.nickname = nickname;
-        conexion.ubicacion = Lobby;
         usuarios.push(conexion);
         Lobby.agregarUsuario(conexion);
         return {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes};
+    },
+    desconectar: function(data, conexion) {
+        conexion.close();
+    },
+    reconectar: function(data, conexion) {
+        console.log(data.nick);
     },
     mensaje: function(data, conexion) {
         var date = new Date();
@@ -287,6 +292,7 @@ Mesa.prototype = {
         return k;
     },
     agregarUsuario: function(conexion) {
+        conexion.ubicacion = this;
         this.usuarios.push(conexion);
         var date = new Date();
         var time = date.getTime();
