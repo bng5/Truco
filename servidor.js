@@ -1,12 +1,37 @@
 #!/usr/bin/env node
 
+var mongo = require('mongodb');
+
+var server = new mongo.Server('localhost', 27017, {auto_reconnect: true});
+var db = new mongo.Db('truco', server, {safe:false});
+
+//db.open(function(err, db) {
+//    if(!err) {
+//        db.collection('usuarios', function(err, collection) {
+//            collection.find().toArray(function(err, results) {
+//                console.log(err);
+//                console.log(results);
+//            });
+//            var doc1 = {'username':'pablo', password: '1234'};
+//            //        var doc2 = {'hello':'doc2'};
+//            //        var lotsOfDocs = [{'hello':'doc3'}, {'hello':'doc4'}];
+//
+//            //        collection.insert(doc1);
+//
+//            //        collection.insert(doc2, {safe:true}, function(err, result) {});
+//            //        collection.insert(lotsOfDocs, {safe:true}, function(err, result) {});
+//        });
+//    }
+//});
+
+
 var ext = {
     extTypes: {
         "css" : "text/css",
-        "html" : "text/html; charset=UTF-8",
+        "html": "text/html; charset=UTF-8",
         "ico" : "image/vnd.microsoft.icon",
-        "js" : "application/javascript",
-        "json" : "application/json",
+        "js"  : "application/javascript",
+        "json": "application/json",
         "png" : "image/png"
     },
     getExt: function (path) {
@@ -36,13 +61,55 @@ var server = http.createServer(function(request, response) {
 
     var uri = url.parse(request.url).pathname;
     var filename = path.join(process.cwd(), 'clientes', uri);
-    if(uri == '/') {
-        response.writeHead(303, {
+    switch(uri) {
+        case '/':
+            response.writeHead(303, {
             "Location": '/alpha/index.html'
-        });
-        response.end();
-        return;
+            });
+            response.end();
+            return;
+            break;
+        case '/signup':
+            if(request.method == 'POST') {
+                
+                //console.log('Content-Type', request.headers['content-type']);
+
+                request.on('data', function(chunk) {
+                    var data = JSON.parse(chunk.toString());
+                    db.collection('usuarios', function(err, collection) {
+                        // TODO Crear índice nick
+                        collection.findOne({username: data.signup_username}, function(err, result) {
+                            response.writeHead(200, {
+                                "Content-Type": ext.getContentType(ext.getExt('json'))
+                            });
+                            if(result) {
+                                response.write(JSON.stringify({error: 'El usuario no está disponible.'}));
+                            }
+                            else {
+                                if(data.signup_password1 != data.signup_password2) {
+                                    response.write(JSON.stringify({error: 'La contraseña y su confirmación no coinciden.'}));
+                                }
+                                else {
+                                    collection.insert({username: data.signup_username, pass: data.signup_password1, email: data.signup_email}, function(err, result) {
+                                        response.write(JSON.stringify({ok: true}));
+                                    });
+                                }
+                            }
+                        });
+                    });
+                });
+            }
+            response.end();
+            return;
+            break;
     }
+//    if(uri == '/') {
+//        response.writeHead(303, {
+//            "Location": '/alpha/index.html'
+//        });
+//        response.end();
+//        return;
+//    }
 
     fs.exists(filename, function(exists) {
         var http_code = 200;
@@ -121,6 +188,7 @@ wsServer.on('request', function(request) {
                 try {
                     respuesta = mediador[data.type](data, this);
                 } catch (exception) {
+                    console.log(exception);
                     respuesta = {type: 'error', cod: 1, desc: 'No se pudo interpretar la orden.'};
                 }
             }
@@ -129,6 +197,7 @@ wsServer.on('request', function(request) {
             }
 
             if(typeof respuesta == 'object') {
+                console.log('Respuesta: ' + respuesta.type);
                 this.sendUTF(JSON.stringify(respuesta));
             }
         }
@@ -166,6 +235,10 @@ wsServer.on('request', function(request) {
 //    });
 });
 
+
+/* ************************************************************************** */
+
+
 var mediador = {
     nick: function(data, conexion) {
         var nickname = data.nick.trim();
@@ -176,6 +249,42 @@ var mediador = {
         usuarios.push(conexion);
         Lobby.agregarUsuario(conexion);
         return {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes};
+    },
+    login: function(data, conexion) {
+        var nickname = data.nick.trim();
+        var password = data.pass.trim();
+//            var nickname = formulario.elements.namedItem('nick').value.replace(/^\s+|\s+$/g, '');
+//console.log(nickname, nickname.length);
+//        if(nickname == '') {}
+
+        db.collection('usuarios', function(err, collection) {
+            // TODO Crear índice nick
+            collection.findOne({username: nickname}, function(err, result) {
+                if(!result) {
+                    // TODO No va más el insert
+                    collection.insert({username: nickname, pass: password}, function(err, result) {
+                        // Duplicado
+                        conexion.nickname = nickname;
+                        usuarios.push(conexion);
+                        Lobby.agregarUsuario(conexion);
+                        broadcast({type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes}, [conexion], null);
+                    });
+                }
+                else {
+                    if(result.pass != password) {
+                        // FIXME Enviar Error correcto
+                        broadcast({type: 'error', desc: 'Usuario incorrecto'}, [conexion], null);
+                        return;
+                    }
+                    // Duplicado
+                    conexion.nickname = nickname;
+                    usuarios.push(conexion);
+                    Lobby.agregarUsuario(conexion);
+                    Lobby.getHistorial(conexion, {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length});
+                    //broadcast({type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes}, [conexion], null);
+                }
+            });
+        });
     },
     desconectar: function(data, conexion) {
         conexion.close();
@@ -192,11 +301,9 @@ var mediador = {
     },
     mesa_crear: function(data, conexion) {
         // TODO: Notifcar Lobby
-        var mesa = new Mesa(data.cantidad);
-        mesas.push(mesa);
-        data.mesa = mesas.indexOf(mesa);
-        return this.mesa_entrar(data, conexion);
-
+        var mesa = new Mesa(conexion, data.cantidad, data.privacidad);
+        //mesas.push(mesa);
+        //data.mesa = mesas.indexOf(mesa);
     },
     mesa_entrar: function(data, conexion) {
         var mesa = mesas[data.mesa];
@@ -204,34 +311,54 @@ var mediador = {
         conexion.ubicacion = mesa;
         conexion.ubicacion.agregarUsuario(conexion);
         // FIXME mesa.jugadores circular data.
+        var i;
         var usuarios = [];
-        for(var i = 0; i < mesa.usuarios.length; i++) {
+        for(i = 0; i < mesa.usuarios.length; i++) {
             usuarios.push({nick: mesa.usuarios[i].nickname});
         }
-        var jugadores = [];
-        for(var i = 0; i < mesa.jugadores.length; i++) {
-            jugadores.push({nick: mesa.usuarios[i].nickname});
+        var _jugadores = [];
+        for(i = 0; i < mesa.jugadores.length; i++) {
+            if(mesa.jugadores[i]) {
+                _jugadores.push({nick: mesa.jugadores[i].nickname});
+            }
+            else {
+                _jugadores.push(null);
+            }
         }
         //jugadores: mesa.jugadores, usuarios: mesa.usuarios,
-        return {type: 'entrada_mesa', historial: mesa.mensajes};
+        mesa.getHistorial(conexion, {type: 'entrada_mesa', jugadores: _jugadores});
     },
     mesa_abandonar: function(data, conexion) {
+        conexion.ubicacion.eliminarUsuario(conexion);
+        conexion.ubicacion = Lobby;
+        conexion.ubicacion.agregarUsuario(conexion);
+        return {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes};
     },
     obtener_mesas: function(data, conexion) {
 
         var listado = [];
         for(var i = 0; i < mesas.length; i++) {
-            listado.push({id: i, cantidadJugadores: mesas[i].cantidadJugadores, usuarios: mesas[i].usuarios.length, jugadores: mesas[i].jugadores.length});
+            listado.push({
+                id: i,
+                _id: mesas[i].id,
+                cantidadJugadores: mesas[i].cantidadJugadores,
+                usuarios: mesas[i].usuarios.length,
+                jugadores: mesas[i].jugadores.length,
+                creadoTiempo: mesas[i].creadoTiempo
+            });
         }
 
-        return {type: 'listado_mesa', "mesas": listado};
+        return {type: 'listado_mesas', "mesas": listado};
     }
 };
 
 function broadcast(data, usuarios, conexion_origen) {
+console.log('broadcast '+data.type);
     var str = JSON.stringify(data);
     for(var i = 0; i < usuarios.length; i++) {
         if(conexion_origen !== usuarios[i]) {
+console.log('     '+usuarios[i].nickname);
+
             usuarios[i].sendUTF(str);
         }
     }
@@ -241,13 +368,31 @@ function Jugador() {
     this.nick = null;
 }
 
-function Mesa(cantidadJugadores) {
-    this.cantidadJugadores = cantidadJugadores;
+function Mesa(propietario, cantidadJugadores, privacidad) {
+    var date = new Date();
+    this.creadoTiempo = date.getTime();
+    this.cantidadJugadores = parseInt(cantidadJugadores);
+    this.privacidad = privacidad;
+    this.jugadores = new Array(this.cantidadJugadores);
+
     this.usuarios = [];
     this.mensajes = [];
-    this.jugadores = [];
+    this.iniciado = false;
     this.muestra;
     this.enJuego = new Array();
+    var self = this;
+
+    db.collection('mesas', function(err, collection) {
+        collection.insert({mensajes: []}, function(err, result) {
+            self.id = result[0]._id;
+            if(propietario) {
+                mesas.push(self);
+                self.jugadores[0] = propietario;
+                var data = {mesa: mesas.indexOf(self)}
+                mediador.mesa_entrar(data, propietario);
+            }
+        });
+    });
 }
 
 Mesa.prototype = {
@@ -268,10 +413,28 @@ Mesa.prototype = {
 
     },
     agregarMensaje: function(data) {
-        this.mensajes.push(data);
-        if(this.mensajes.length > 10) {
-            this.mensajes.splice(0, 1)
-        }
+
+        var self = this;
+        db.collection('mesas', function(err, mesas) {
+            mesas.update({_id: self.id}, {$push: {mensajes: data}}, function(err, result) {
+                
+            });
+        });
+//        this.mensajes.push(data);
+//        if(this.mensajes.length > 10) {
+//            this.mensajes.splice(0, 1)
+//        }
+    },
+    getHistorial: function(conexion, data) {
+        var self = this;
+        db.collection('mesas', function(err, mesas) {
+console.log('find '+self.id);
+            mesas.findOne({_id: self.id}, function(err, item) {
+                console.log(item);
+                data.historial = item.mensajes;
+                broadcast(data, [conexion], null);
+            });
+        });
     },
     repartir: function() {
 
@@ -298,11 +461,11 @@ Mesa.prototype = {
         var time = date.getTime();
         var data = {type: 'user_add', nick: conexion.nickname, tiempo: time};
         this.agregarMensaje(data);
-        broadcast(data, this.usuarios, null);//conexion);
+        broadcast(data, this.usuarios, null);
     }
 };
 
-var Lobby = new Mesa();
+var Lobby = new Mesa(null, 0);
 //var Lobby = {
 //    usuarios: [],
 //    mensajes: [],

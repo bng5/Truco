@@ -3,7 +3,15 @@
   <meta charset="utf-8" />
   <title>Truco - Alpha</title>
   <link href="truco.css" rel="stylesheet" type="text/css" />
+  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+<!--    <script src="http://code.jquery.com/jquery-1.8.2.js"></script> -->
   <script type="text/javascript" src="cliente.js"></script>
+
+
+    <link rel="stylesheet" href="http://code.jquery.com/ui/1.9.1/themes/base/jquery-ui.css" />
+    <script src="http://code.jquery.com/ui/1.9.1/jquery-ui.js"></script>
+
+    
 </head>
 <body>
 
@@ -16,9 +24,40 @@
     <div id="distance"></div>
     <div id="login_form">
         <form action="" method="post" onsubmit="return login(this)">
-            <label for="nick" title="Nick (4 a 16 caracteres)">Nick</label>
-            <input type="text" name="nick" id="nick" maxlength="16" />
-            <input type="submit" value="Entrar" />
+            <ul>
+                <li>
+                    <label for="nick" title="Nick (4 a 16 caracteres)">Nick</label>
+                    <input type="text" name="nick" id="nick" maxlength="16" />
+                </li>
+                <li>
+                    <label for="password" title="Contraseña">Contraseña</label>
+                    <input type="password" name="password" id="password" maxlength="16" />
+                </li>
+                <li class="botones"><button type="submit">Entrar</button></li>
+            </ul>
+        </form>
+    </div>
+    <div id="signup_form">
+        <form action="/signup" method="post" onsubmit="return signup(this)">
+            <ul>
+                <li>
+                    <label for="signup_username" title="Nombre de usuario (4 a 16 caracteres)">Nombre de usuario</label>
+                    <input type="text" name="signup_username" id="signup_username" maxlength="16" />
+                </li>
+                <li>
+                    <label for="signup_password1" title="Contraseña">Contraseña</label>
+                    <input type="password" name="signup_password1" id="signup_password1" maxlength="16" />
+                </li>
+                <li>
+                    <label for="signup_password" title="Contraseña">Repita contraseña</label>
+                    <input type="password" name="signup_password2" id="signup_password2" maxlength="16" />
+                </li>
+                <li>
+                    <label for="signup_email" title="Contraseña">E-mail</label>
+                    <input type="email" name="signup_email" id="signup_email" />
+                </li>
+                <li class="botones"><button type="submit">Entrar</button></li>
+            </ul>
         </form>
     </div>
     <p id="version"> </p>
@@ -33,14 +72,16 @@
     </div>
     <div id="mesas">
         <p>Mesas: <span id="total_mesas"> </span></p>
-        <ul></ul>
-        <input type="button" value="Crear mesa" onclick="crearMesa(2)" />
+        <ul id="lista_mesas"></ul>
+        <input type="button" value="Crear mesa" id="mesa_crear" />
         <input type="button" value="Desconectar" onclick="desconectar()" />
     </div>
 </div>
 
 <div id="mesa" class="pantalla" hidden="hidden">
     <h2>Mesa</h2>
+    <input type="button" value="Abandonar mesa" onclick="abandonarMesa()" />
+    <div id="area_juego"></div>
     <div id="chat_mesa">
         <div id="mensajes_mesa" class="mensajes"></div>
         <textarea cols="15" rows="2" onkeypress="return capturaEnter(event, this)"></textarea><input type="button" value="Enviar" onclick="enviarMensaje(this.previousSibling)" />
@@ -48,6 +89,20 @@
 </div>
 
 
+    <div id="mesa_crear_dialog" title="Crear mesa" hidden="hidden" class="dialogo">
+        <form action="" method="post" name="mesa_crear_form">
+            <div id="jugadores_radio">
+                <input type="radio" id="jugadores_radio1" name="jugadores" value="2" checked="checked" /><label for="jugadores_radio1" title="2 jugadores">2</label>
+                <input type="radio" id="jugadores_radio2" name="jugadores" value="4" /><label for="jugadores_radio2" title="4 jugadores">4</label>
+                <input type="radio" id="jugadores_radio3" name="jugadores" value="6" /><label for="jugadores_radio3" title="6 jugadores">6</label>
+            </div>
+            <div id="privacidad_radio">
+                <input type="radio" id="privacidad_radio1" name="privacidad" value="0" checked="checked" /><label for="privacidad_radio1">Público</label>
+                <input type="radio" id="privacidad_radio2" name="privacidad" value="1" /><label for="privacidad_radio2">No definido</label>
+                <input type="radio" id="privacidad_radio3" name="privacidad" value="2" /><label for="privacidad_radio3">Privado</label>
+            </div>
+        </form>
+    </div>
     <!-- pre id="output"></pre>
     <div id="comandos">
         <button onclick="conectar()">Conectar</button>
