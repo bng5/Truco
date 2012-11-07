@@ -323,28 +323,16 @@ var mediador = {
         db.collection('usuarios', function(err, collection) {
             // TODO Crear índice nick
             collection.findOne({username: nickname}, function(err, result) {
-                if(!result) {
-                    // TODO No va más el insert
-                    collection.insert({username: nickname, pass: password}, function(err, result) {
-                        // Duplicado
+                if(result) {
+                    if(result.pass == password) {
                         conexion.nickname = nickname;
                         usuarios.push(conexion);
                         Lobby.agregarUsuario(conexion);
-                        broadcast({type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes}, [conexion], null);
-                    });
-                }
-                else {
-                    if(result.pass != password) {
-                        // FIXME Enviar Error correcto
-                        broadcast({type: 'error', desc: 'Usuario incorrecto'}, [conexion], null);
+                        Lobby.getHistorial(conexion, {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length});
                         return;
                     }
-                    // Duplicado
-                    conexion.nickname = nickname;
-                    usuarios.push(conexion);
-                    Lobby.agregarUsuario(conexion);
-                    Lobby.getHistorial(conexion, {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length});
-                    //broadcast({type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes}, [conexion], null);
+                    // FIXME Enviar Error correcto
+                    broadcast({type: 'error', desc: 'Usuario incorrecto'}, [conexion], null);
                 }
             });
         });

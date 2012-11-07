@@ -72,6 +72,7 @@ console.log(data.type);
 }
 
 function mostrar(pantalla) {
+    $('#error').hide();
     $('.pantalla').hide();
     $('#'+pantalla).show();
 
