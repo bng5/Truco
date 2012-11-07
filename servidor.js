@@ -1,9 +1,39 @@
 #!/usr/bin/env node
 
+
+var CAMPOS = {
+    DATOS_REQUERIDOS: 1,
+    TIPO_NO_VALIDO: 2,
+    VALORES_INCORRECTOS: 4,
+
+    REQUIRED: 1,
+    DATATYPE_ERROR: 2,
+    VALUE_ERROR: 3,
+    MINLEN_ERROR: 4,
+    MAXLEN_ERROR: 5
+}
+var CAMPOS_DESC = {
+    1: 'Campo requerido',
+    2: 'Tipo de dato no válido',
+    3: 'Dato incorrecto',
+    4: 'Campo demasiado corto',
+    5: 'Campo muy largo'
+}
+
+
 var mongo = require('mongodb');
 
 var server = new mongo.Server('localhost', 27017, {auto_reconnect: true});
 var db = new mongo.Db('truco', server, {safe:false});
+
+
+// MD5 para gravatar
+/*
+var data = "asdf";
+var crypto = require('crypto');
+crypto.createHash('md5').update(data).digest("hex");
+// '912ec803b2ce49e4a541068d495ab570'
+*/
 
 //db.open(function(err, db) {
 //    if(!err) {
@@ -71,35 +101,68 @@ var server = http.createServer(function(request, response) {
             break;
         case '/signup':
             if(request.method == 'POST') {
-                
                 //console.log('Content-Type', request.headers['content-type']);
 
                 request.on('data', function(chunk) {
-                    var data = JSON.parse(chunk.toString());
+                    try {
+                        var data = JSON.parse(chunk.toString());
+                    } catch (err) {
+                        response.writeHead(400, {
+                            "Content-Type": 'text/plain; charset=UTF-8'
+                        });
+                        response.write('Bad Request');
+                        response.end();
+                        return;
+                    }
+
                     db.collection('usuarios', function(err, collection) {
                         // TODO Crear índice nick
-                        collection.findOne({username: data.signup_username}, function(err, result) {
+                        var errores = [];
+                        data.username = data.username.replace(/^\s+|\s+$/g, '');
+                        if(data.username == '') {
+                            errores.push({campo: 'username', cod: CAMPOS.REQUIRED, desc: CAMPOS_DESC[CAMPOS.REQUIRED]});
+                        }
+                        else {
+                            var formatoUsername = /^[a-z][-_.a-záéíóüñ0-9]{3,15}$/i;
+                            if(!formatoUsername.test(data.username)) {
+                                errores.push({campo: 'username', cod: CAMPOS.DATATYPE_ERROR, desc: 'Formato no válido'});
+                            }
+                        }
+                        if(data.password1 != data.password2) {
+                            errores.push({campo: 'password2', cod: CAMPOS.VALUE_ERROR, desc: 'La contraseña y su confirmación no coinciden'});
+                        }
+                        if(errores.length) {
+                            response.write(JSON.stringify({correcto: false, 'errores': errores}));
+                            response.end();
+                            return;
+                        }
+                        
+
+                        collection.findOne({username: data.username}, function(err, result) {
                             response.writeHead(200, {
                                 "Content-Type": ext.getContentType(ext.getExt('json'))
                             });
                             if(result) {
-                                response.write(JSON.stringify({error: 'El usuario no está disponible.'}));
+                                response.write(JSON.stringify({correcto: false, errores: [{campo: 'username', cod: CAMPOS.VALUE_ERROR, desc: 'El nombre de usuario no está disponible.'}]}));
+                                response.end();
                             }
                             else {
-                                if(data.signup_password1 != data.signup_password2) {
-                                    response.write(JSON.stringify({error: 'La contraseña y su confirmación no coinciden.'}));
-                                }
-                                else {
-                                    collection.insert({username: data.signup_username, pass: data.signup_password1, email: data.signup_email}, function(err, result) {
-                                        response.write(JSON.stringify({ok: true}));
-                                    });
-                                }
+                                collection.insert({username: data.username, pass: data.password1, email: data.email}, function(err, result) {
+                                    response.write(JSON.stringify({correcto: true}));
+                                    response.end();
+                                });
                             }
                         });
                     });
                 });
             }
-            response.end();
+            else {
+                response.writeHead(405, {
+                    "Content-Type": 'text/plain; charset=UTF-8'
+                });
+                response.write('Method Not Allowed');
+                response.end();
+            }
             return;
             break;
     }
@@ -335,7 +398,6 @@ var mediador = {
         return {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes};
     },
     obtener_mesas: function(data, conexion) {
-
         var listado = [];
         for(var i = 0; i < mesas.length; i++) {
             listado.push({
@@ -349,6 +411,9 @@ var mediador = {
         }
 
         return {type: 'listado_mesas', "mesas": listado};
+    },
+    partida_unirse: function(data, conexion) {
+        conexion.ubicacion.agregarJugador(conexion, data.pos);
     }
 };
 
@@ -369,6 +434,7 @@ function Jugador() {
 }
 
 function Mesa(propietario, cantidadJugadores, privacidad) {
+    this.id;
     var date = new Date();
     this.creadoTiempo = date.getTime();
     this.cantidadJugadores = parseInt(cantidadJugadores);
@@ -383,19 +449,37 @@ function Mesa(propietario, cantidadJugadores, privacidad) {
     var self = this;
 
     db.collection('mesas', function(err, collection) {
-        collection.insert({mensajes: []}, function(err, result) {
+        collection.insert({creadoTiempo: self.creadoTiempo, mensajes: []}, function(err, result) {
             self.id = result[0]._id;
+console.log(err, self.id);
             if(propietario) {
                 mesas.push(self);
                 self.jugadores[0] = propietario;
                 var data = {mesa: mesas.indexOf(self)}
                 mediador.mesa_entrar(data, propietario);
+                broadcast({type: 'mesa_agregar', mesa: {
+                    id: mesas.indexOf(self),
+                    _id: self.id,
+                    cantidadJugadores: self.cantidadJugadores,
+                    usuarios: self.usuarios.length,
+                    jugadores: self.jugadores.length,
+                    creadoTiempo: self.creadoTiempo
+                }}, Lobby.usuarios, null);
             }
         });
     });
 }
 
 Mesa.prototype = {
+    agregarUsuario: function(conexion) {
+        conexion.ubicacion = this;
+        this.usuarios.push(conexion);
+        var date = new Date();
+        var time = date.getTime();
+        var data = {type: 'user_add', nick: conexion.nickname, tiempo: time};
+        this.agregarMensaje(data);
+        broadcast(data, this.usuarios, null);
+    },
     eliminarUsuario: function(conexion) {
         this.usuarios.splice(this.usuarios.indexOf(conexion), 1);
         var date = new Date();
@@ -408,9 +492,15 @@ Mesa.prototype = {
             var index = mesas.indexOf(this);
             if(index > -1) {
                 mesas.splice(mesas.indexOf(this), 1);
+                broadcast({type: 'mesa_eliminar', mesa: {id: index, _id: this.id}}, Lobby.usuarios, null);
             }
         }
-
+    },
+    agregarJugador: function(conexion, pos) {
+        if(this.jugadores.indexOf(conexion) == -1) {
+            this.jugadores[pos] = conexion;
+            broadcast({type: 'jugador_agregar', jugador: conexion.nickname, 'pos': pos}, conexion.ubicacion.usuarios, null);
+        }
     },
     agregarMensaje: function(data) {
 
@@ -431,7 +521,7 @@ Mesa.prototype = {
 console.log('find '+self.id);
             mesas.findOne({_id: self.id}, function(err, item) {
                 console.log(item);
-                data.historial = item.mensajes;
+                data.historial = item ? item.mensajes : [];
                 broadcast(data, [conexion], null);
             });
         });
@@ -453,19 +543,16 @@ console.log('find '+self.id);
         }while(valida == false);
         this.enJuego.push(k);
         return k;
-    },
-    agregarUsuario: function(conexion) {
-        conexion.ubicacion = this;
-        this.usuarios.push(conexion);
-        var date = new Date();
-        var time = date.getTime();
-        var data = {type: 'user_add', nick: conexion.nickname, tiempo: time};
-        this.agregarMensaje(data);
-        broadcast(data, this.usuarios, null);
     }
 };
 
-var Lobby = new Mesa(null, 0);
+var Lobby;
+db.open(function(err, db) {
+    if(err) {
+        console.log("MongoDB: No estás conectado.");
+    }
+    Lobby = new Mesa(null, 0);
+});
 //var Lobby = {
 //    usuarios: [],
 //    mensajes: [],

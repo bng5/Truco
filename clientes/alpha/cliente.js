@@ -71,6 +71,12 @@ console.log(data.type);
     };
 }
 
+function mostrar(pantalla) {
+    $('.pantalla').hide();
+    $('#'+pantalla).show();
+
+}
+
 function login(formulario) {
     var nickname = formulario.elements.namedItem('nick').value.replace(/^\s+|\s+$/g, '');
     //var nickname = formulario.elements.namedItem('nick').value;
@@ -109,7 +115,19 @@ function signup(formulario) {
         dataType: 'json',
         contentType: 'application/json; charset=UTF-8',
         success: function(data, textStatus, jqXHR) {
-            console.log(data, textStatus, jqXHR);
+            //console.log(data, textStatus, jqXHR);
+            if(data.correcto) {
+                mostrar('login');
+            }
+            else {
+                var error;
+                for(var i = 0; i < data.errores.length; i++) {
+                    error = data.errores[i];
+                    $("#signup_"+error.campo).addClass('error').one("keyup", function() {
+                        $(this).removeClass('error')
+                    });
+                }
+            }
         }
     });
     return false;
@@ -155,6 +173,16 @@ function obtenerMesas() {
     websocket.send(JSON.stringify({type: 'obtener_mesas'}));
 }
 
+function partidaUnirse(link) {
+    var li = link.parentNode;
+    var i = 0;
+    while(li.previousSibling) {
+        i++
+        li = li.previousSibling;
+    }
+    websocket.send(JSON.stringify({type: 'partida_unirse', pos: i}));
+}
+
 var Chat = {
     mensajes: null,
     textarea: null,
@@ -183,16 +211,13 @@ var Chat = {
 
 var listeners = {
     conectado: function(data) {
-        //docdata.espera
-        document.getElementById('version').firstChild.textContent = 'Versión: '+data.version;
+        //document.getElementById('version').firstChild.textContent = 'Versión: '+data.version;
     },
     entrada_lobby: function(data) {
-        document.getElementById('login').hidden = true;
-        document.getElementById('mesa').hidden = true;
-        document.getElementById('lobby').hidden = false;
+        mostrar('lobby');
         document.getElementById('total_usuarios').firstChild.textContent = data.total_usuarios;
-        document.getElementById('total_mesas').firstChild.textContent = data.total_mesas;
-console.log(data.total_mesas);
+        //document.getElementById('total_mesas').firstChild.textContent = data.total_mesas;
+
         if(data.total_mesas) {
             obtenerMesas();
         }
@@ -204,11 +229,14 @@ console.log(data.total_mesas);
         //console.log('Mesas: %s. Usuarios: %s', data.total_mesas, data.total_usuarios)
     },
     entrada_mesa: function(data) {
-        document.getElementById('lobby').hidden = true;
-        document.getElementById('mesa').hidden = false;
+        mostrar('mesa');
         var mensajes = document.getElementById('mensajes');
         while(mensajes.firstChild) {
             mensajes.removeChild(mensajes.firstChild);
+        }
+        var mesas = document.getElementById('lista_mesas');
+        while(mesas.firstChild) {
+            mesas.removeChild(mesas.firstChild);
         }
 
         //document.getElementById('total_usuarios').firstChild.textContent = data.total_usuarios;
@@ -217,12 +245,25 @@ console.log(data.total_mesas);
         for(var i = 0; i < data.historial.length; i++) {
             this[data.historial[i].type](data.historial[i]);
         }
-console.log(data.jugadores);
+console.log(data);
         var jugadores = '';
+        var en_juego = false;
         for(var i = 0; i < data.jugadores.length; i++) {
-            jugadores += '<li class="equipo '+(i%2 ? 'b' : 'a')+'">'+(data.jugadores[i] ? data.jugadores[i].nick : '<a title="Unirse a la partida" onclick="alert(\'unirse\')">_____________</a>')+'</li>';
+            jugadores += '<li class="equipo '+(i%2 ? 'b' : 'a');
+            if(data.jugadores[i]) {
+                if(jugador.nick == data.jugadores[i].nick) {
+                    en_juego = true;
+                }
+                jugadores += '">'+data.jugadores[i].nick+'</li>';
+            }
+            else {
+                jugadores += ' esperando"><a onclick="partidaUnirse(this)">Unirse a la partida</a></li>';
+            }
         }
-        $("#area_juego").html('<ol>'+jugadores+'</ol>');
+        $("#area_juego").html('<ol id="equipos">'+jugadores+'</ol>');
+        if(en_juego) {
+            $('#equipos li.esperando').html('Esperando jugador');
+        }
 
     },
     error: function(data) {
@@ -244,6 +285,7 @@ console.log(data.jugadores);
         var li, a;
         for(var i = 0; i < data.mesas.length; i++) {
             li = lista.appendChild(document.createElement('li'));
+            li.id = 'mesa_'+data.mesas[i]._id;
             a = li.appendChild(document.createElement('a'));
             a.setAttribute('data-mesa', data.mesas[i].id);
             a.addEventListener('click', entrarMesa, false);
@@ -252,11 +294,31 @@ console.log(data.jugadores);
 //            creadoTiempo 1351916419994
 //            usuarios 1
         }
+    },
+    mesa_agregar: function(data) {
+        var lista = document.getElementById('lista_mesas');
+        var li = lista.appendChild(document.createElement('li'));
+        li.id = 'mesa_'+data.mesa._id;
+        var a = li.appendChild(document.createElement('a'));
+        a.setAttribute('data-mesa', data.mesa.id);
+        a.addEventListener('click', entrarMesa, false);
+        a.appendChild(document.createTextNode(data.mesa._id));
+        li.appendChild(document.createTextNode(' ('+data.mesa.jugadores+'/'+data.mesa.cantidadJugadores+')'));
+    },
+    mesa_eliminar: function(data) {
+        var lista = document.getElementById('lista_mesas');
+        lista.removeChild(document.getElementById('mesa_'+data.mesa._id));
+    },
+    jugador_agregar: function(data) {
+        $('#equipos li:nth-child('+(data.pos + 1)+')').html(data.jugador).removeClass('esperando');
+        if(jugador.nick == data.jugador) {
+            $('#equipos li.esperando').html('Esperando jugador');
+        }
+
     }
 };
+
 window.addEventListener("load", init, false);
-
-
 
 
 function newExcitingAlerts(msg) {
