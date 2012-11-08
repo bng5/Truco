@@ -21,19 +21,13 @@ var CAMPOS_DESC = {
 }
 
 
+var crypto = require('crypto');
 var mongo = require('mongodb');
 
 var server = new mongo.Server('localhost', 27017, {auto_reconnect: true});
 var db = new mongo.Db('truco', server, {safe:false});
 
 
-// MD5 para gravatar
-/*
-var data = "asdf";
-var crypto = require('crypto');
-crypto.createHash('md5').update(data).digest("hex");
-// '912ec803b2ce49e4a541068d495ab570'
-*/
 
 //db.open(function(err, db) {
 //    if(!err) {
@@ -137,7 +131,6 @@ var server = http.createServer(function(request, response) {
                             return;
                         }
                         
-
                         collection.findOne({username: data.username}, function(err, result) {
                             response.writeHead(200, {
                                 "Content-Type": ext.getContentType(ext.getExt('json'))
@@ -147,7 +140,8 @@ var server = http.createServer(function(request, response) {
                                 response.end();
                             }
                             else {
-                                collection.insert({username: data.username, pass: data.password1, email: data.email}, function(err, result) {
+                                var hash = crypto.createHash('md5').update(data.email).digest("hex");
+                                collection.insert({username: data.username, pass: data.password1, email: data.email, email_hash: hash}, function(err, result) {
                                     response.write(JSON.stringify({correcto: true}));
                                     response.end();
                                 });
@@ -303,16 +297,16 @@ wsServer.on('request', function(request) {
 
 
 var mediador = {
-    nick: function(data, conexion) {
-        var nickname = data.nick.trim();
-//            var nickname = formulario.elements.namedItem('nick').value.replace(/^\s+|\s+$/g, '');
-//console.log(nickname, nickname.length);
-//        if(nickname == '') {}
-        conexion.nickname = nickname;
-        usuarios.push(conexion);
-        Lobby.agregarUsuario(conexion);
-        return {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes};
-    },
+//    nick: function(data, conexion) {
+//        var nickname = data.nick.trim();
+////            var nickname = formulario.elements.namedItem('nick').value.replace(/^\s+|\s+$/g, '');
+////console.log(nickname, nickname.length);
+////        if(nickname == '') {}
+//        conexion.nickname = nickname;
+//        usuarios.push(conexion);
+//        Lobby.agregarUsuario(conexion);
+//        return {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length, historial: Lobby.mensajes};
+//    },
     login: function(data, conexion) {
         var nickname = data.nick.trim();
         var password = data.pass.trim();
@@ -326,6 +320,7 @@ var mediador = {
                 if(result) {
                     if(result.pass == password) {
                         conexion.nickname = nickname;
+                        conexion.email_hash = result.email_hash;
                         usuarios.push(conexion);
                         Lobby.agregarUsuario(conexion);
                         Lobby.getHistorial(conexion, {type: 'entrada_lobby', total_mesas: mesas.length, total_usuarios: usuarios.length});
@@ -370,7 +365,7 @@ var mediador = {
         var _jugadores = [];
         for(i = 0; i < mesa.jugadores.length; i++) {
             if(mesa.jugadores[i]) {
-                _jugadores.push({nick: mesa.jugadores[i].nickname});
+                _jugadores.push({nick: mesa.jugadores[i].nickname, hash: mesa.jugadores[i].email_hash});
             }
             else {
                 _jugadores.push(null);
@@ -487,7 +482,7 @@ Mesa.prototype = {
     agregarJugador: function(conexion, pos) {
         if(this.jugadores.indexOf(conexion) == -1) {
             this.jugadores[pos] = conexion;
-            broadcast({type: 'jugador_agregar', jugador: conexion.nickname, 'pos': pos}, conexion.ubicacion.usuarios, null);
+            broadcast({type: 'jugador_agregar', jugador: {username: conexion.nickname, hash: conexion.email_hash}, 'pos': pos}, conexion.ubicacion.usuarios, null);
         }
     },
     agregarMensaje: function(data) {

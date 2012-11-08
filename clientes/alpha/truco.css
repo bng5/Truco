@@ -96,6 +96,8 @@ a {
     }
 
 .chat p {
+    font-family: Consolas, "Liberation Mono", Courier, monospace;
+    font-size: 12px;
     white-space: pre;
 }
 
@@ -133,7 +135,8 @@ a {
     }
     #equipos li {
         float: left;
-        padding: 0 1%;
+        line-height: 40px;
+        padding: 6px 1%;
         width: 48%;
     }
     #equipos .equipo.a {
@@ -141,6 +144,14 @@ a {
     }
     #equipos .equipo.b {
         text-align: left;
+    }
+    #equipos .equipo.a img {
+        float: right;
+        margin-left: 5px;
+    }
+    #equipos .equipo.b img {
+        float: left;
+        margin-right: 5px;
     }
     #equipos .equipo a:hover {
         text-decoration: none;

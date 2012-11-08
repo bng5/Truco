@@ -246,16 +246,16 @@ var listeners = {
         for(var i = 0; i < data.historial.length; i++) {
             this[data.historial[i].type](data.historial[i]);
         }
-console.log(data);
         var jugadores = '';
         var en_juego = false;
+console.log(data.jugadores);
         for(var i = 0; i < data.jugadores.length; i++) {
             jugadores += '<li class="equipo '+(i%2 ? 'b' : 'a');
             if(data.jugadores[i]) {
                 if(jugador.nick == data.jugadores[i].nick) {
                     en_juego = true;
                 }
-                jugadores += '">'+data.jugadores[i].nick+'</li>';
+                jugadores += '"><img src="'+gravatarUrl(data.jugadores[i].hash)+'" /> '+data.jugadores[i].nick+'</li>';
             }
             else {
                 jugadores += ' esperando"><a onclick="partidaUnirse(this)">Unirse a la partida</a></li>';
@@ -311,8 +311,8 @@ console.log(data);
         lista.removeChild(document.getElementById('mesa_'+data.mesa._id));
     },
     jugador_agregar: function(data) {
-        $('#equipos li:nth-child('+(data.pos + 1)+')').html(data.jugador).removeClass('esperando');
-        if(jugador.nick == data.jugador) {
+        $('#equipos li:nth-child('+(data.pos + 1)+')').html('<img src="'+gravatarUrl(data.jugador.hash)+'" /> '+data.jugador.username).removeClass('esperando');
+        if(jugador.nick == data.jugador.username) {
             $('#equipos li.esperando').html('Esperando jugador');
         }
 
@@ -362,3 +362,8 @@ $(function() {
         });
     });
 });
+
+function gravatarUrl(hash) {
+    return 'http://www.gravatar.com/avatar/'+hash+'?s=40&d=mm';
+}
+
